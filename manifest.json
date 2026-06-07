@@ -1,0 +1,26 @@
+{
+  "name": "서현관퇴실체크아웃v1",
+  "short_name": "서현관퇴실체크아웃v1",
+  "description": "서현관 여학생 기숙사 호실별 상벌점 퇴실 체크아웃 시스템",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef2f7",
+  "theme_color": "#db2777",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
