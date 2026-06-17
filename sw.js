@@ -1,5 +1,5 @@
 // sw.js - 서현관퇴실체크아웃v1 Service Worker
-const CACHE_NAME = 'seohyeon-checkout-v3';
+const CACHE_NAME = 'seohyeon-checkout-v4';
 const ASSETS = [
   './index.html',
   './manifest.json',
