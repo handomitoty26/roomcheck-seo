@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>여학생 기숙사 호실별 상벌점 체크아웃</title>
+    <!-- PWA 설정 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#db2777">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="서현관퇴실체크아웃v1">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --ink:#1f2d3d; --sub:#64748b;
+    --line:#e2e8f0; --blue:#db2777; --blue-d:#be185d; --green:#16a34a; 
+    --red:#dc2626; --amber:#d97706; --purple:#7c3aed; --slate:#475569;
+    --g1:#ef4444; --g2:#2563eb; --g3:#059669; 
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:var(--bg);color:var(--ink);font-size:15px;line-height:1.4;}
+  .wrap{max-width:1400px;margin:0 auto;padding:10px 10px 0;min-height:100vh;display:flex;flex-direction:column;}
+  /* 헤더 */
+  header{background:linear-gradient(135deg,#9d174d,#db2777);color:#fff;border-radius:14px;
+    padding:9px 14px;box-shadow:0 4px 14px rgba(157,23,77,.25); margin-bottom:8px;}
+  .h-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  #prog-title{font-size:17px;font-weight:800;letter-spacing:-.5px;cursor:pointer;flex:1;min-width:150px;}
+  #prog-title::after{content:" ✎";font-size:12px;opacity:.6;}
+  .date-box{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);
+    padding:4px 6px;border-radius:9px;}
+  .date-box input{border:none;background:#fff;border-radius:6px;padding:4px 6px;font-size:13px;color:var(--ink);font-weight:700;}
+  .mini{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:7px;padding:5px 9px;
+    font-size:12px;font-weight:800;cursor:pointer;}
+  .mini:active{transform:scale(.96);}
+  .fs{background:rgba(255,255,255,.16);}
+  /* 툴바 */
+  .toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px;}
+  .tool{flex:1 1 auto;min-width:96px;border:none;border-radius:9px;padding:9px 6px;font-size:13px;
+    font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:4px;}
+  .t-home{background:var(--slate);} .t-merit{background:var(--green);} .t-sum{background:var(--blue);}
+  .t-set{background:#0891b2;}
+  /* 연동 상태 바 */
+  .link-bar{border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:700;margin-bottom:8px;cursor:pointer;
+    display:flex;align-items:center;gap:6px;border:1px solid transparent;}
+  .link-bar.on{background:#ecfdf5;color:#047857;border-color:#a7f3d0;}
+  .link-bar.off{background:#fff7ed;color:#b45309;border-color:#fed7aa;}
+  /* 통계 줄 */
+  .stat{display:flex;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--sub);margin-bottom:8px;padding:0 2px;}
+  .stat b{color:var(--ink);}
+  /* 호실 그리드 */
+  .floor{flex:1;min-height:0;}
+  .grid{display:grid;grid-template-columns:repeat(var(--cols, auto-fill),minmax(150px,1fr));gap:10px;}
+
+  /* ===== 전체화면 한 화면 맞춤 모드 ===== */
+  body.fit{overflow:hidden;}
+  body.fit .wrap{height:100vh;height:100dvh;padding:6px 8px 0;overflow:hidden;max-width:none;}
+  body.fit header{padding:6px 12px;border-radius:10px;margin-bottom:6px;}
+  body.fit #prog-title{font-size:15px;}
+  body.fit .toolbar{margin:0 0 4px;}
+  body.fit .tool{padding:6px 5px;font-size:12px;min-width:80px;}
+  body.fit .link-bar{padding:5px 10px;font-size:11px;margin-bottom:5px;}
+  body.fit .stat{font-size:11px;margin-bottom:5px;}
+  body.fit .floor{flex:1 1 auto;min-height:0;overflow:hidden;}
+  body.fit .grid{height:100%;grid-template-columns:repeat(var(--cols,5),1fr);grid-auto-rows:1fr;gap:5px;overflow:hidden;}
+  body.fit .room{box-shadow:none;border-radius:9px;min-height:0;display:flex;flex-direction:column;}
+  body.fit .room-head{padding:4px 8px;flex:0 0 auto;}
+  body.fit .room-no{font-size:var(--rno,15px);}
+  body.fit .room-no .gear{display:none;}
+  body.fit .bd{font-size:9px;padding:1px 4px;}
+  body.fit .students{padding:4px;gap:var(--stugap,4px);overflow:hidden;flex:1 1 auto;min-height:0;justify-content:stretch;}
+  body.fit .stu{padding:2px 8px;gap:6px;border-radius:7px;flex:1 1 0;min-height:0;}
+  body.fit .stu .gdot{width:9px;height:9px;}
+  body.fit .stu .hk{font-size:calc(var(--nm,16px) - 4px);}
+  body.fit .stu .nm{font-size:var(--nm,16px);}
+  body.fit .stu .mk{font-size:calc(var(--nm,16px) - 5px);}
+  body.fit .stu .ex-tag{font-size:calc(var(--nm,16px) - 5px);padding:0 5px;}
+  body.fit .memo{padding:5px 10px;margin:5px 0;border-radius:9px;flex:0 0 auto;}
+  body.fit .memo h4{font-size:11px;margin:0 0 3px;}
+  body.fit .memo textarea{height:34px;padding:5px 8px;font-size:12px;line-height:1.3;}
+  .room{background:var(--card);border-radius:12px;border:1px solid var(--line);
+    box-shadow:0 1px 4px rgba(0,0,0,.05);overflow:hidden;}
+  .room.flagged{border-color:#fca5a5;box-shadow:0 0 0 2px #fee2e2;}
+  .room.merit{border-color:#86efac;}
+  .room-head{padding:8px 10px;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;
+    justify-content:space-between;gap:4px;border-bottom:1px solid var(--line);}
+  .room-no{font-size:16px;font-weight:800;color:var(--ink);}
+  .room-no .gear{font-size:10px;color:#94a3b8;}
+  .badges{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;}
+  .bd{font-size:10px;font-weight:800;padding:2px 5px;border-radius:6px;color:#fff;white-space:nowrap;}
+  .bd-room{background:var(--red);} .bd-merit{background:var(--green);}
+  .students{padding:7px;display:flex;flex-direction:column;gap:5px;}
+  .stu{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:#f8fafc;
+    border:1px solid #eef2f7;cursor:pointer;transition:.1s;position:relative;}
+  .stu:active{transform:scale(.98);}
+  .stu.has{background:#fff1f2;border-color:#fecdd3;}
+  .stu .gdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .stu .hk{font-size:11px;font-weight:700;color:#94a3b8;flex:0 0 auto;font-variant-numeric:tabular-nums;}
+  .g1{background:var(--g1);} .g2{background:var(--g2);} .g3{background:var(--g3);}
+  .stu .nm{font-size:14px;font-weight:700;flex:1;}
+  .stu .mk{font-size:10px;font-weight:800;color:var(--red);}
+  .stu.excluded{background:#e2e8f0;color:#94a3b8;cursor:not-allowed;border-style:dashed;}
+  .stu.excluded .gdot{opacity:.3;}
+  .stu.excluded .nm{text-decoration:line-through;font-weight:600;}
+  .stu .ex-tag{font-size:10px;font-weight:800;padding:1px 5px;border-radius:5px;color:#fff;}
+  .ex-귀가{background:#0ea5e9;} .ex-퇴사{background:#64748b;} .ex-미입사{background:#a855f7;}
+  .ex-명령퇴사{background:#475569;} .ex-자진퇴사{background:#94a3b8;} .ex-조퇴{background:#f59e0b;} .ex-결석{background:#e11d48;} .ex-외출{background:#0ea5e9;}
+  /* 메모 */
+  .memo{flex:0 0 auto;background:var(--card);border-radius:12px;padding:10px 14px;margin:10px 0;
+    border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.05);}
+  .memo h4{margin:0 0 6px;font-size:13px;color:var(--slate);}
+  .memo textarea{width:100%;height:62px;border:1px solid var(--line);border-radius:8px;padding:9px;
+    font-size:14px;font-family:inherit;resize:none;background:#f8fafc;line-height:1.5;}
+  .memo textarea:focus{outline:none;border-color:var(--blue);background:#fff;}
+  /* 메모 입력 시 가상 키보드 위로 띄우기 */
+  body.memo-float .memo{position:fixed;left:8px;right:8px;bottom:var(--kb,0);z-index:60;margin:0;
+    box-shadow:0 -6px 24px rgba(0,0,0,.22);border-color:var(--blue);}
+  body.memo-float .memo textarea{height:84px;}
+  body.fit.memo-float .memo textarea{height:72px;font-size:14px;}
+  /* 모달 */
+  .ov{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;z-index:50;
+    align-items:center;justify-content:center;padding:14px;}
+  .ov.show{display:flex;}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:460px;max-height:88vh;overflow:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,.3);}
+  .m-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+    justify-content:space-between;position:sticky;top:0;background:#fff;z-index:2;}
+  .m-head h3{margin:0;font-size:17px;font-weight:800;}
+  .m-head .x{background:#f1f5f9;border:none;border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer;color:var(--sub);}
+  .m-body{padding:14px 16px;}
+  .m-sub{font-size:12px;color:var(--sub);margin-bottom:10px;}
+  .opt{display:flex;align-items:center;gap:10px;padding:12px;border:2px solid var(--line);border-radius:10px;
+    margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:700;transition:.12s;}
+  .opt.sel{border-color:var(--red);background:#fff1f2;color:var(--red);}
+  .opt.sel.good{border-color:var(--green);background:#f0fdf4;color:var(--green);}
+  .opt .ck{width:22px;height:22px;border:2px solid #cbd5e1;border-radius:6px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;}
+  .opt.sel .ck{background:var(--red);border-color:var(--red);}
+  .opt.sel.good .ck{background:var(--green);border-color:var(--green);}
+  .opt .opt-label{flex:1;}
+  .merit-row{display:flex;gap:6px;margin-top:6px;}
+  .merit-row .mb{flex:1;padding:11px;border:2px solid var(--line);border-radius:10px;text-align:center;
+    font-weight:800;cursor:pointer;font-size:15px;}
+  .merit-row .mb.sel{border-color:var(--green);background:#f0fdf4;color:var(--green);}
+  .sec-t{font-size:13px;font-weight:800;color:var(--slate);margin:14px 0 8px;border-top:1px dashed var(--line);padding-top:12px;}
+  .m-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;position:sticky;bottom:0;background:#fff;}
+  .btn{flex:1;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;}
+  .btn-p{background:var(--blue);color:#fff;} .btn-g{background:#f1f5f9;color:var(--slate);}
+  .btn-r{background:#fee2e2;color:var(--red);}
+  textarea.paste{width:100%;height:120px;border:1px solid var(--line);border-radius:8px;padding:9px;font-size:13px;font-family:inherit;}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .tbl th,.tbl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:center;}
+  .tbl th{background:#f1f5f9;font-weight:800;color:var(--slate);position:sticky;top:0;}
+  .tbl tr.top{background:#f0fdf4;font-weight:800;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--slate);margin-bottom:4px;}
+  .field input,.field select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;}
+  .floor-cks{display:flex;gap:8px;flex-wrap:wrap;}
+  .floor-cks label{display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid var(--line);
+    border-radius:8px;padding:8px 12px;font-size:14px;font-weight:700;cursor:pointer;}
+  .floor-cks input{width:auto;}
+  .sum-pre{white-space:pre-wrap;font-size:13px;line-height:1.6;background:#f8fafc;border:1px solid var(--line);
+    border-radius:10px;padding:12px;max-height:46vh;overflow:auto;}
+  .ex-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;}
+  .ex-item .enm{flex:1;font-weight:700;font-size:14px;}
+  .ex-item select{padding:6px;border:1px solid var(--line);border-radius:7px;font-size:13px;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2d3d;color:#fff;
+    padding:11px 18px;border-radius:30px;font-size:14px;font-weight:700;z-index:99;opacity:0;transition:.3s;pointer-events:none;}
+  .toast.show{opacity:.95;}
+  .hint{font-size:11.5px;color:var(--sub);background:#f8fafc;border:1px dashed var(--line);border-radius:8px;padding:8px;margin-top:8px;line-height:1.5;}
+  /* 달력 */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:16px;}
+  .cal-arrow{background:#f1f5f9;border:none;border-radius:8px;width:36px;height:32px;font-size:18px;font-weight:800;color:var(--slate);cursor:pointer;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-w{text-align:center;font-size:11px;font-weight:800;color:var(--sub);padding:2px 0;}
+  .cal-w.sun{color:#dc2626;}
+  .cal-d{position:relative;aspect-ratio:1/1;border:1px solid var(--line);border-radius:8px;background:#fff;
+    font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .cal-d:active{transform:scale(.95);}
+  .cal-d.has{border-color:#93c5fd;color:var(--blue-d);}
+  .cal-d.has::after{content:"";position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+    width:5px;height:5px;border-radius:50%;background:var(--blue);}
+  .cal-d.today{box-shadow:inset 0 0 0 2px #fbbf24;}
+  .cal-d.cur{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .cal-d.cur.has::after{background:#fff;}
+  .ex-결석{background:#e11d48;} .ex-조퇴{background:#f59e0b;}
+  .stu.excluded.ex-bg-귀가{background:#e0f2fe;border-color:#7dd3fc;}
+  .stu.excluded.ex-bg-퇴사{background:#e2e8f0;border-color:#cbd5e1;}
+  .stu.excluded.ex-bg-미입사{background:#f3e8ff;border-color:#d8b4fe;}
+  .stu.excluded.ex-bg-결석{background:#ffe4e6;border-color:#fda4af;}
+  .stu.excluded.ex-bg-조퇴{background:#fef3c7;border-color:#fcd34d;}
+  .stu.excluded.ex-bg-명령퇴사{background:#e2e8f0;border-color:#cbd5e1;}
+  .stu.excluded.ex-bg-자진퇴사{background:#e2e8f0;border-color:#cbd5e1;}
+  .stu.excluded.ex-bg-외출{background:#e0f2fe;border-color:#7dd3fc;}
+  .tool.linked{background:#dcfce7 !important;color:#166534 !important;box-shadow:inset 0 0 0 2px #22c55e;}
+  .gd-toggle{display:flex;align-items:center;gap:8px;margin-top:8px;padding:9px;border:1px dashed var(--line);border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;color:var(--slate);}
+  .gd-toggle small{display:block;font-weight:400;color:var(--sub);font-size:11px;margin-top:2px;}
+  .gd-row{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:14px;font-weight:700;}
+  #gd-status{line-height:1.7;font-size:12.5px;}
+</style>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('sw.js')
+            .then(function(reg) { console.log('SW registered'); })
+            .catch(function(err) { console.log('SW error', err); });
+        });
+      }
+    </script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="h-top">
+      <div id="prog-title" onclick="editProgTitle()">여학생 기숙사 호실별 상벌점 체크아웃</div>
+      <div class="date-box">
+        <input type="date" id="date-input" onchange="onDateChange()">
+        <button class="mini" onclick="goToday()">오늘</button>
+        <button class="mini" onclick="openCalendar(false)">🗓️</button>
+      </div>
+      <button class="mini fs" id="fs-btn" onclick="toggleFull()">⛶ 전체화면</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button class="tool t-home" id="link-tool-btn" onclick="openLink()">🔗 당일 일지 연동</button>
+    <button class="tool t-merit" onclick="openMerit()">🏅 상점 집계</button>
+    <button class="tool t-sum" onclick="openSummary()">📊 오늘 집계</button>
+    <button class="tool t-set" onclick="openData()">⚙️ 설정·데이터</button>
+    <input type="file" id="restore-file" accept=".json" style="display:none" onchange="doRestore(event)">
+  </div>
+
+  <div class="link-bar" id="link-bar" onclick="openLink()"></div>
+  <div class="stat" id="stat"></div>
+  <div class="floor"><div class="grid" id="grid"></div></div>
+
+  <div class="memo">
+    <h4>📝 당일 특이사항 메모 (자동 저장)</h4>
+    <textarea id="memo" placeholder="체크아웃 중 특이사항을 기록하세요. (선택한 날짜·자동 저장)"></textarea>
+  </div>
+</div>
+
+<div class="ov" id="ov-stu">
+  <div class="modal">
+    <div class="m-head"><h3 id="stu-title"></h3><button class="x" onclick="closeOv('ov-stu')">✕</button></div>
+    <div class="m-body">
+      <div class="m-sub">개인 벌점 항목을 선택하세요.</div>
+      <div id="stu-opts"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-r" onclick="clearStu()">초기화</button>
+      <button class="btn btn-p" onclick="saveStu()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-room">
+  <div class="modal">
+    <div class="m-head"><h3 id="room-title"></h3><button class="x" onclick="closeOv('ov-room')">✕</button></div>
+    <div class="m-body">
+      <div class="m-sub">호실 전체 벌점(전 인원 공통)을 선택하세요.</div>
+      <div id="room-opts"></div>
+      <div class="sec-t">🏅 정리정돈 우수 등급 (상점용 누적 체크)</div>
+      <div class="merit-row" id="merit-opts"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-r" onclick="clearRoom()">초기화</button>
+      <button class="btn btn-p" onclick="saveRoom()">저장</button>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="ov" id="ov-merit">
+  <div class="modal">
+    <div class="m-head"><h3>🏅 상점 순위 집계</h3><button class="x" onclick="closeOv('ov-merit')">✕</button></div>
+    <div class="m-body">
+      <div class="m-sub">기간 내 정리정돈 우수 등급(상 3 · 중 2 · 하 1점)을 합산해 순위를 매깁니다. 표시 없는 날은 0점으로 합산됩니다.</div>
+      <div style="display:flex;gap:8px;">
+        <div class="field" style="flex:1"><label>시작일</label><input type="date" id="merit-from"></div>
+        <div class="field" style="flex:1"><label>종료일</label><input type="date" id="merit-to"></div>
+        <div class="field" style="width:90px"><label>상위 N개</label><input type="number" id="merit-n" value="5" min="1"></div>
+      </div>
+      <div class="field">
+        <label>대상 층 (복수 선택 가능)</label>
+        <div class="floor-cks" id="merit-floors">
+          <label><input type="checkbox" value="2" checked>2층</label>
+          <label><input type="checkbox" value="3" checked>3층</label>
+          <label><input type="checkbox" value="4" checked>4층</label>
+          <label><input type="checkbox" value="5" checked>5층</label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <button class="btn btn-p" onclick="calcMerit()">집계</button>
+      </div>
+      <div id="merit-result"></div>
+      <div class="sec-t">📜 상점 부여 기록</div>
+      <div id="merit-log"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-sum">
+  <div class="modal">
+    <div class="m-head"><h3>📊 오늘 체크아웃 집계</h3><button class="x" onclick="closeOv('ov-sum')">✕</button></div>
+    <div class="m-body"><div class="sum-pre" id="sum-text"></div></div>
+    <div class="m-foot">
+      <button class="btn btn-g" onclick="copySummary()">📋 복사</button>
+      <button class="btn btn-p" onclick="closeOv('ov-sum')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-data">
+  <div class="modal">
+    <div class="m-head"><h3>⚙️ 설정 · 데이터</h3><button class="x" onclick="closeOv('ov-data')">✕</button></div>
+    <div class="m-body">
+
+      <div class="sec-t" style="border-top:none;margin-top:0;padding-top:0">📋 방배정 명단 등록</div>
+      <div class="m-sub">엑셀(.xlsx)을 등록하면 호실·학생 구성이 교체되며, 다시 등록하기 전까지 기억됩니다.</div>
+      <div id="roster-status"></div>
+      <div class="field" style="margin-top:8px">
+        <input type="file" id="roster-file" accept=".xlsx,.xls,.csv" onchange="parseRoster(event)">
+      </div>
+      <div id="roster-preview"></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn btn-g" onclick="resetRoster()">기본 내장 명단</button>
+        <button class="btn btn-p" id="roster-apply" onclick="applyRoster()" disabled>명단 등록 적용</button>
+      </div>
+
+      <div class="sec-t">💾 백업 / 복원</div>
+      <div class="m-sub">모든 날짜의 상벌점·상점등급·메모가 <b>파일 1개</b>에 저장됩니다(날짜별 파일이 생기지 않음). 복원하면 달력에서 날짜를 골라 볼 수 있습니다.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p" onclick="doBackup()">💾 전체 백업(1개)</button>
+        <button class="btn btn-g" onclick="document.getElementById('restore-file').click()">📂 복원</button>
+      </div>
+      <button class="btn btn-g" style="margin-top:8px" onclick="closeOv('ov-data');openCalendar(false)">🗓️ 기록 달력 보기</button>
+
+      <div class="sec-t">☁️ 구글 드라이브 자동 백업</div>
+      <div class="m-sub" id="gd-status"></div>
+      <button class="btn btn-g" style="margin-top:6px" onclick="driveBackupNow(true)">☁️ 지금 드라이브로 백업</button>
+      <div class="gd-toggle" onclick="toggleDriveSettings()">
+        <span id="gd-setting-ico">⚙️</span>
+        <span id="gd-setting-lbl">드라이브 연결 설정 열기<small>클라이언트 ID · 구글 연결 · 자동 백업</small></span>
+      </div>
+      <div id="gd-settings-panel" style="display:none">
+        <div class="field" style="margin-top:8px"><label>OAuth 클라이언트 ID</label>
+          <input id="gd-clientid" placeholder="xxxxx.apps.googleusercontent.com" oninput="saveDriveClientId()"></div>
+        <button class="btn btn-p" onclick="driveConnect()">🔗 구글 연결(인증)</button>
+        <label class="gd-row"><input type="checkbox" id="gd-auto" onchange="toggleDriveAuto()" style="width:auto"> 앱 켤 때 자동 백업</label>
+        <div class="field"><label>날짜별 백업 보관 일수</label>
+          <input type="number" id="gd-keepdays" min="1" value="30" onchange="saveDriveKeepDays()"></div>
+        <div class="hint">관리일지와 <b>같은 Cloud 프로젝트의 클라이언트 ID</b>를 입력하세요. 프로그램 제목 + "_백업" 폴더에 <b>최신.json</b>과 날짜별 파일이 저장되고, 보관 일수가 지난 날짜 파일은 자동 정리됩니다.</div>
+      </div>
+
+      <div class="sec-t">📊 엑셀로 내보내기 (보고용)</div>
+      <div style="display:flex;gap:8px">
+        <div class="field" style="flex:1;margin:0"><label>시작일</label><input type="date" id="exp-from"></div>
+        <div class="field" style="flex:1;margin:0"><label>종료일</label><input type="date" id="exp-to"></div>
+      </div>
+      <button class="btn btn-p" style="margin-top:6px" onclick="exportXlsx()">📊 엑셀(.xlsx) 내보내기</button>
+
+      <div class="sec-t">🔄 자동 초기화</div>
+      <div id="auto-info"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-link">
+  <div class="modal">
+    <div class="m-head"><h3>🔗 당일 일지 연동</h3><button class="x" onclick="closeOv('ov-link')">✕</button></div>
+    <div class="m-body">
+      <div class="m-sub">‘기숙사 일지’의 <b>기숙사입실현황</b> 시트를 연동하면 <b id="link-date-lbl"></b>의 미입사·퇴사·귀가·결석 학생이 자동으로 체크 대상에서 제외되고 색깔로 구분 표시됩니다.</div>
+      <div id="link-status-box"></div>
+      <div class="field" style="margin-top:10px">
+        <label>① 기숙사 일지 엑셀 선택 (.xlsx) — ‘기숙사입실현황’ 시트</label>
+        <input type="file" id="link-file" accept=".xlsx,.xls" onchange="parseLink(event)">
+      </div>
+      <div id="link-preview"></div>
+      <div class="hint">‘미입사자·퇴사자’ 구역과 ‘귀가자’ 구역을 자동 인식해, 학번·이름이 일치하는 현재 명단 학생을 상태별 색으로 표시합니다.</div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-r" onclick="unlinkLog()">연동 해제</button>
+      <button class="btn btn-p" id="link-apply" onclick="applyLink()" disabled>연동 적용</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-cal">
+  <div class="modal" style="max-width:380px">
+    <div class="m-head"><h3>🗓️ 기록 달력</h3><button class="x" onclick="closeOv('ov-cal')">✕</button></div>
+    <div class="m-body">
+      <div class="m-sub">파란 점이 있는 날은 기록이 있는 날입니다. 날짜를 누르면 그 날 시트로 이동합니다.</div>
+      <div id="cal-body"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-g" onclick="closeOv('ov-cal')">닫기</button>
+        <button class="btn btn-p" onclick="pickDate(workDateStr())">오늘로</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 데이터 ===== */
+const DORM_DATA = {"students": [], "defaultExclusions": []};
+
+const STUDENTS_DEFAULT = DORM_DATA.students;
+const DEFAULT_EXCL = DORM_DATA.defaultExclusions;
+
+const INDIV_ITEMS = ["침구 미정리","실외화 반입"];
+const ROOM_ITEMS  = ["호실정리불량","슬리퍼 미정리","미소등"];
+const MERIT_PTS = {"상":3,"중":2,"하":1};
+
+// 독립된 저장소 키 사용
+const STORE_KEY = "dormCheckoutData_girls_v1";
+const ROSTER_KEY = "dormRoster_girls_v1";
+
+/* 활성 명단(방배정) */
+let STUDENTS=[], byHak={}, ROOMS={};
+let rosterMeta = { source:"기본 내장 명단", count:0, when:"" };
+
+function buildRoster(students){
+  STUDENTS = students.slice();
+  byHak={}; ROOMS={};
+  STUDENTS.forEach(s=>byHak[s.hak]=s);
+  STUDENTS.forEach(s=>{
+    (ROOMS[s.room]=ROOMS[s.room]||[]).push(s);
+  });
+  Object.keys(ROOMS).forEach(no=>ROOMS[no].sort((a,b)=>String(a.hak).localeCompare(String(b.hak),undefined,{numeric:true})));
+}
+
+function loadRoster(){
+  try{
+    const d=JSON.parse(localStorage.getItem(ROSTER_KEY));
+    if(d && d.students && d.students.length){ rosterMeta=d.meta||rosterMeta; buildRoster(d.students); return; }
+  }catch(e){}
+  rosterMeta={source:"기본 내장 명단", count:DORM_DATA.students.length, when:""};
+  buildRoster(DORM_DATA.students);
+}
+loadRoster();
+
+/* ===== 저장소 ===== */
+let DB = load();
+function load(){
+  try{ const d=JSON.parse(localStorage.getItem(STORE_KEY)); if(d&&d.records) return d; }catch(e){}
+  return { progTitle:"여학생 기숙사 호실별 상벌점 체크아웃", meritLog:[], records:{} };
+}
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+
+function todayStr(){ const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function localHour(){ return new Date().getHours(); }
+/* 업무 기준일: 근무가 15시~다음날 09시이므로, 오전 11시 이전이면 전날(근무 시작일) 시트를 유지하고
+   오전 11시에 오늘(새 시트)로 자동 초기화한다. 기록은 날짜별로 영구 보관됨. */
+function workDateStr(){
+  const d=new Date();
+  if(d.getHours() < 11){ d.setDate(d.getDate()-1); }
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+let curDate = workDateStr();
+let autoFollow = true;
+
+/* 날짜 레코드 가져오기 */
+function isLongTerm(st){ return /퇴사|미입사/.test(st||''); }
+/* manualSet(hak→true): 사람이 직접 지정한 제외자만 기록. 연동/승계가 오염시키지 않으며,
+   manualSet에 없는 장기 제외자(퇴사/미입사)는 연동/승계 시 정리된다. */
+function rec(date){
+  if(DB.records[date]) return DB.records[date];
+  const r={individual:{},room:{},exclusions:{},manualSet:{},memo:""};
+  const prior = Object.keys(DB.records).filter(d=>d<date).sort();
+  if(prior.length){
+    const p=DB.records[prior[prior.length-1]];
+    const pms=p.manualSet||{};
+    Object.entries(p.exclusions||{}).forEach(([h,st])=>{
+      if(isLongTerm(st) && pms[h]){ r.exclusions[h]=st; r.manualSet[h]=true; }
+    });
+  }else if(Object.keys(DB.records).length === 0){
+    DEFAULT_EXCL.forEach(e=>{ r.exclusions[e.hak]=e.status; r.manualSet[e.hak]=true; });
+  }
+  DB.records[date]=r; return r;
+}
+function R(){ return rec(curDate); }
+
+/* ===== 자동 초기화 ===== */
+let _autoTimer=null;
+function modalOpen(){ return [...document.querySelectorAll('.ov')].some(o=>o.classList.contains('show')); }
+function autoRollCheck(){
+  const t=workDateStr(), h=localHour();
+  if(autoFollow && curDate < t && !modalOpen()){
+    curDate = t;
+    document.getElementById('date-input').value = t;
+    render();
+    toast(`${t} 새 날짜 시트로 자동 전환 (전날 기록은 보관)`);
+  }
+  if(h>=11 && DB.lastAutoClear!==t){ DB.lastAutoClear=t; save(); }
+}
+
+/* ===== 초기화 ===== */
+function init(){
+  if(!DB.lastAutoClear) DB.lastAutoClear='';
+  document.getElementById('date-input').value = curDate;
+  document.getElementById('prog-title').textContent = DB.progTitle;
+  const memoEl=document.getElementById('memo');
+  if(!memoEl._bound){ memoEl.addEventListener('input', e=>{ R().memo=e.target.value; save(); }); memoEl._bound=true; }
+  render(); setupMemoScroll();
+  autoRollCheck();
+  if(_autoTimer) clearInterval(_autoTimer);
+  _autoTimer=setInterval(autoRollCheck, 60000);
+  save();
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoRollCheck(); });
+window.addEventListener('focus', autoRollCheck);
+
+function onDateChange(){
+  curDate=document.getElementById('date-input').value||workDateStr();
+  autoFollow = (curDate >= workDateStr());
+  render();
+}
+function goToday(){ curDate=workDateStr(); autoFollow=true;
+  document.getElementById('date-input').value=curDate; render(); }
+
+/* ===== 메인 렌더 ===== */
+function render(){
+  document.getElementById('date-input').value=curDate;
+  const r=R();
+  document.getElementById('memo').value=r.memo||"";
+  const grid=document.getElementById('grid'); grid.innerHTML='';
+
+  const allRooms = Object.keys(ROOMS).sort((a,b)=>+a-+b);
+  allRooms.forEach(no=>{
+    const studs=ROOMS[no];
+    const rd=r.room[no]||{demerits:{},merit:""};
+    const roomDem=Object.keys(rd.demerits||{}).filter(k=>rd.demerits[k]);
+    const flagged = roomDem.length>0;
+    const card=document.createElement('div');
+    card.className='room'+(flagged?' flagged':'')+(rd.merit?' merit':'');
+    
+    let badges='';
+    roomDem.forEach(d=>badges+=`<span class="bd bd-room">${shortDem(d)}</span>`);
+    if(rd.merit) badges+=`<span class="bd bd-merit">상점 ${rd.merit}</span>`;
+    
+    card.innerHTML=`<div class="room-head" onclick="openRoom('${no}')">
+        <span class="room-no">${no}호</span>
+        <span class="badges">${badges}</span></div>`;
+        
+    const sc=document.createElement('div'); sc.className='students';
+    studs.forEach(s=>{
+      const st=r.exclusions[s.hak];
+      const div=document.createElement('div');
+      if(st){
+        div.className='stu excluded ex-bg-'+st;
+        div.innerHTML=`<span class="gdot g${s.grade}"></span><span class="hk">${s.hak}</span><span class="nm">${s.name}</span>
+          <span class="ex-tag ex-${st}">${st}</span>`;
+      }else{
+        const ind=r.individual[s.hak]||{};
+        const has=Object.keys(ind).filter(k=>ind[k]);
+        div.className='stu'+(has.length?' has':'');
+        div.innerHTML=`<span class="gdot g${s.grade}"></span><span class="hk">${s.hak}</span><span class="nm">${s.name}</span>
+          ${has.length?`<span class="mk">${has.map(shortDem).join(' ')}</span>`:''}`;
+        div.onclick=()=>openStu(s.hak);
+      }
+      sc.appendChild(div);
+    });
+    card.appendChild(sc);
+    grid.appendChild(card);
+  });
+  renderStat(allRooms);
+  renderLinkBar();
+  fitGrid();
+}
+
+function shortDem(d){
+  return {"침구 미정리":"침구","실외화 반입":"실외화","호실정리불량":"정리불량","슬리퍼 미정리":"슬리퍼","미소등":"미소등"}[d]||d;
+}
+
+function renderStat(allRooms){
+  const r=R();
+  let nStu=0,nExcl=0,nIndiv=0,nRoom=0,nMerit=0;
+  allRooms.forEach(no=>{
+    ROOMS[no].forEach(s=>{ nStu++; if(r.exclusions[s.hak])nExcl++;
+      else{ const ind=r.individual[s.hak]||{}; if(Object.values(ind).some(v=>v))nIndiv++; } });
+    const rd=r.room[no]; if(rd){ if(Object.values(rd.demerits||{}).some(v=>v))nRoom++; if(rd.merit)nMerit++; }
+  });
+  document.getElementById('stat').innerHTML=
+    `전체 호실 <b>${allRooms.length}</b> · 인원 <b>${nStu-nExcl}</b>명(제외 ${nExcl}) · `+
+    `개인벌점 <b style="color:#dc2626">${nIndiv}</b>명 · 호실벌점 <b style="color:#dc2626">${nRoom}</b>실 · 정리우수 <b style="color:#16a34a">${nMerit}</b>실`;
+}
+
+/* ===== 개인 벌점 모달 ===== */
+function attachTap(el, fn){
+  el.addEventListener('click', function(e){
+    const now=Date.now();
+    if(el._lastTap && now-el._lastTap<320) return;
+    el._lastTap=now; fn(e);
+  });
+}
+
+let stuTarget=null, stuSel={};
+function openStu(hak){
+  stuTarget=hak; const s=byHak[hak]; const r=R();
+  stuSel=Object.assign({}, r.individual[hak]||{});
+  document.getElementById('stu-title').textContent=`${s.room}호 · ${s.hak} ${s.name} (${s.grade}학년)`;
+  const box=document.getElementById('stu-opts'); box.innerHTML='';
+  INDIV_ITEMS.forEach(it=>{
+    const d=document.createElement('div'); d.className='opt';
+    const ck=document.createElement('span'); ck.className='ck';
+    const tx=document.createElement('span'); tx.className='opt-label'; tx.textContent=it;
+    d.appendChild(ck); d.appendChild(tx);
+    const paint=()=>{ const sel=!!stuSel[it]; d.classList.toggle('sel',sel); ck.textContent=sel?'✓':''; };
+    paint();
+    attachTap(d, ()=>{ stuSel[it]=!stuSel[it]; paint(); });
+    box.appendChild(d);
+  });
+  showOv('ov-stu');
+}
+function saveStu(){
+  const r=R(); const clean={}; Object.keys(stuSel).forEach(k=>{if(stuSel[k])clean[k]=true;});
+  if(Object.keys(clean).length) r.individual[stuTarget]=clean; else delete r.individual[stuTarget];
+  save(); closeOv('ov-stu'); render(); toast('저장되었습니다');
+}
+function clearStu(){ stuSel={}; openStu(stuTarget); }
+
+/* ===== 호실 전체 모달 ===== */
+let roomTarget=null, roomSel={}, meritSel="";
+function openRoom(no){
+  roomTarget=no; const r=R(); const rd=r.room[no]||{demerits:{},merit:""};
+  roomSel=Object.assign({}, rd.demerits||{}); meritSel=rd.merit||"";
+  const studs=ROOMS[no]; const active=studs.filter(s=>!r.exclusions[s.hak]).length; const ex=studs.length-active;
+  document.getElementById('room-title').textContent=`${no}호 전체 (재실 ${active}명${ex?` · 제외 ${ex}`:''})`;
+  const box=document.getElementById('room-opts'); box.innerHTML='';
+  if(active===0){ box.innerHTML='<div class="hint" style="color:#dc2626">재실 인원이 없어 전체 벌점을 입력할 수 없습니다.</div>'; }
+  else ROOM_ITEMS.forEach(it=>{
+    const d=document.createElement('div'); d.className='opt';
+    const ck=document.createElement('span'); ck.className='ck';
+    const tx=document.createElement('span'); tx.className='opt-label'; tx.textContent=it;
+    d.appendChild(ck); d.appendChild(tx);
+    const paint=()=>{ const sel=!!roomSel[it]; d.classList.toggle('sel',sel); ck.textContent=sel?'✓':''; };
+    paint();
+    attachTap(d, ()=>{ roomSel[it]=!roomSel[it]; paint(); });
+    box.appendChild(d);
+  });
+  const mr=document.getElementById('merit-opts'); mr.innerHTML='';
+  const btns={};
+  ["상","중","하"].forEach(g=>{
+    const b=document.createElement('div'); b.className='mb'; b.textContent=g;
+    btns[g]=b;
+    attachTap(b, ()=>{ meritSel=(meritSel===g?'':g);
+      Object.keys(btns).forEach(k=>btns[k].classList.toggle('sel', meritSel===k)); });
+    mr.appendChild(b);
+  });
+  Object.keys(btns).forEach(k=>btns[k].classList.toggle('sel', meritSel===k));
+  showOv('ov-room');
+}
+function saveRoom(){
+  const r=R(); const clean={}; Object.keys(roomSel).forEach(k=>{if(roomSel[k])clean[k]=true;});
+  if(Object.keys(clean).length||meritSel) r.room[roomTarget]={demerits:clean,merit:meritSel};
+  else delete r.room[roomTarget];
+  save(); closeOv('ov-room'); render(); toast('저장되었습니다');
+}
+function clearRoom(){ roomSel={}; meritSel=""; openRoom(roomTarget); }
+
+/* ===== 상점 순위 집계 ===== */
+function openMerit(){
+  const to=curDate; const from=addDays(curDate,-13);
+  document.getElementById('merit-from').value=from;
+  document.getElementById('merit-to').value=to;
+  document.getElementById('merit-result').innerHTML='';
+  renderMeritLog(); showOv('ov-merit'); calcMerit();
+}
+function calcMerit(){
+  const from=document.getElementById('merit-from').value, to=document.getElementById('merit-to').value;
+  const N=+document.getElementById('merit-n').value||5;
+  const sel=[...document.querySelectorAll('#merit-floors input:checked')].map(c=>c.value);
+  const res=document.getElementById('merit-result');
+  if(!sel.length){ res.innerHTML='<div class="hint">대상 층을 1개 이상 선택하세요.</div>'; return; }
+  
+  const scores={}, detail={};
+  const allRooms=Object.keys(ROOMS);
+  
+  // 선택된 층의 호실만 필터링 (호실번호의 첫 글자로 층 판별)
+  const targetRooms = allRooms.filter(no => sel.includes(no[0]));
+  targetRooms.forEach(no=>{ scores[no]=0; detail[no]=[]; });
+  
+  Object.keys(DB.records).forEach(d=>{
+    if(d<from||d>to) return;
+    const rr=DB.records[d].room||{};
+    Object.entries(rr).forEach(([no,rd])=>{
+      if(!(no in scores)) return; // 선택한 층이 아니면 패스
+      if(rd.merit){ scores[no]+=MERIT_PTS[rd.merit]; detail[no].push(rd.merit); }
+    });
+  });
+  
+  const ranked=Object.keys(scores).sort((a,b)=>scores[b]-scores[a]||(+a-+b));
+  if(!ranked.length){ res.innerHTML='<div class="hint">대상 호실이 없습니다.</div>'; return; }
+  
+  let h=`<div class="m-sub">대상: ${sel.map(f=>f+'층').join(', ')} · 호실 ${ranked.length}개</div>`;
+  h+=`<table class="tbl"><tr><th>순위</th><th>호실</th><th>점수</th><th>등급내역(상·중·하)</th><th>선택</th></tr>`;
+  ranked.forEach((no,i)=>{
+    const cnt={상:0,중:0,하:0}; detail[no].forEach(g=>cnt[g]++);
+    const studs=(ROOMS[no]||[]).map(s=>`${s.hak} ${s.name}`).join(', ');
+    h+=`<tr class="${i<N?'top':''}"><td>${i+1}</td><td><b>${no}호</b><div style="font-size:11px;color:#64748b;font-weight:400;margin-top:3px;line-height:1.5">${studs||'-'}</div></td><td>${scores[no]}</td>
+      <td>${cnt.상}·${cnt.중}·${cnt.하}</td>
+      <td><input type="checkbox" class="award-ck" data-no="${no}" ${i<N&&scores[no]>0?'checked':''}></td></tr>`;
+  });
+  h+=`</table><button class="btn btn-g" style="margin-top:10px" onclick="awardMerit('${from}','${to}')">✅ 체크한 호실에 상점 부여 기록</button>`;
+  res.innerHTML=h;
+}
+function awardMerit(from,to){
+  const cks=[...document.querySelectorAll('.award-ck:checked')].map(c=>c.dataset.no);
+  if(!cks.length){ toast('부여할 호실을 선택하세요'); return; }
+  const note=prompt(`상점 부여 호실: ${cks.join(', ')}\n메모(선택):`,'2주 정리정돈 우수 상점');
+  if(note===null) return;
+  DB.meritLog.unshift({date:new Date().toISOString().slice(0,10),period:`${from}~${to}`,rooms:cks,note});
+  save(); renderMeritLog(); toast(`${cks.length}개 호실 상점 부여 기록됨`);
+}
+function renderMeritLog(){
+  const box=document.getElementById('merit-log');
+  if(!DB.meritLog||!DB.meritLog.length){ box.innerHTML='<div class="hint">아직 상점 부여 기록이 없습니다.</div>'; return; }
+  box.innerHTML=DB.meritLog.map((m,i)=>`<div class="ex-item"><span class="enm">
+    <b>${m.date}</b> · ${m.rooms.join(', ')}호<br><span style="font-size:12px;color:#64748b">${m.note||''} (${m.period})</span></span>
+    <button class="btn btn-r" style="flex:0;padding:6px 9px;font-size:12px" onclick="rmMeritLog(${i})">삭제</button></div>`).join('');
+}
+function rmMeritLog(i){ DB.meritLog.splice(i,1); save(); renderMeritLog(); }
+
+/* ===== 오늘 집계 ===== */
+function openSummary(){
+  const r=R();
+  const byHakAsc=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true});
+  let out=`■ ${DB.progTitle}\n■ 체크일: ${curDate}\n`;
+
+  // 1) 호실 전체 벌점 : 호실 + 항목 + 대상 학생(학번 이름), 부재자(귀가·퇴사·미입사) 제외
+  const roomBlocks=[];
+  Object.keys(ROOMS).sort((a,b)=>+a-+b).forEach(no=>{
+    const rd=r.room[no]||{}; const dem=Object.keys(rd.demerits||{}).filter(k=>rd.demerits[k]);
+    if(!dem.length) return;
+    const studs=(ROOMS[no]||[]).filter(s=>!r.exclusions[s.hak])
+      .sort((a,b)=>byHakAsc(a.hak,b.hak)).map(s=>`${s.hak} ${s.name}`);
+    roomBlocks.push(`${no}호 [${dem.join(', ')}]\n   대상: ${studs.length?studs.join(', '):'(재실 인원 없음)'}`);
+  });
+
+  // 2) 개인 벌점 : 벌점 항목별 그룹, 각 그룹 내 학번 오름차순 (호실 미표시)
+  const byItem={}; let indivCount=0;
+  Object.keys(r.individual).forEach(hak=>{
+    const s=byHak[hak]; if(!s) return;
+    const ks=Object.keys(r.individual[hak]).filter(k=>r.individual[hak][k]);
+    if(ks.length) indivCount++;
+    ks.forEach(it=>{ (byItem[it]=byItem[it]||[]).push({hak,name:s.name}); });
+  });
+
+  out+=`\n── 호실 전체 벌점 (${roomBlocks.length}실) ──\n`;
+  out+= roomBlocks.length ? roomBlocks.join('\n')+'\n' : '없음\n';
+
+  out+=`\n── 개인 벌점 (${indivCount}명) ──\n`;
+  const items=Object.keys(byItem);
+  if(!items.length){ out+='없음\n'; }
+  else{
+    const order=(typeof INDIV_ITEMS!=='undefined')?INDIV_ITEMS.slice():[];
+    items.sort((a,b)=>{ let ia=order.indexOf(a), ib=order.indexOf(b);
+      if(ia===-1)ia=999; if(ib===-1)ib=999; return ia-ib || a.localeCompare(b); });
+    items.forEach(it=>{
+      const list=byItem[it].sort((a,b)=>byHakAsc(a.hak,b.hak));
+      out+=`[${it}] (${list.length}명)\n`;
+      list.forEach(p=>{ out+=`   ${p.hak} ${p.name}\n`; });
+    });
+  }
+
+  if(r.memo && r.memo.trim()) out+=`\n[메모]\n${r.memo.trim()}\n`;
+  document.getElementById('sum-text').textContent=out.trim();
+  showOv('ov-sum');
+}
+function copySummary(){ const t=document.getElementById('sum-text').textContent;
+  navigator.clipboard?.writeText(t).then(()=>toast('복사되었습니다'),()=>fallbackCopy(t)); }
+function fallbackCopy(t){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta);
+  ta.select(); try{document.execCommand('copy');toast('복사되었습니다');}catch(e){} ta.remove(); }
+
+/* ===== 백업 / 복원 ===== */
+function nowStamp(){ const d=new Date(); const p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes()); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* 백업 페이로드: 명단 + 전체 기록 */
+function buildBackupPayload(){
+  return {_app:"dormCheckout",_ver:2,exportedAt:new Date().toISOString(),
+    roster:{students:STUDENTS,meta:rosterMeta}, data:DB};
+}
+function doBackup(){
+  const payload=buildBackupPayload();
+  const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`${(DB.progTitle||'기숙사퇴실체크아웃')}_백업_${nowStamp()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  const n=Object.keys(DB.records||{}).length;
+  toast(`전체 백업 완료 (학생 ${STUDENTS.length} · 기록 ${n}일분)`);
+}
+function doRestore(ev){
+  const f=ev.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=e=>{ try{
+      const d=JSON.parse(e.target.result);
+      const data = d.data || d;                 // 신규(payload) · 구버전(DB 직접) 모두 지원
+      if(!data || !data.records){ toast('올바른 백업 파일이 아닙니다'); ev.target.value=''; return; }
+      const n=Object.keys(data.records).length;
+      if(!confirm(`이 백업으로 복원할까요? (기록 ${n}일분)\n현재 기기의 입력 내용은 대체됩니다.`)){ ev.target.value=''; return; }
+      DB=data;
+      if(!DB.meritLog)DB.meritLog=[];
+      if(!DB.tabs||!DB.tabs.length){ const fls=Object.keys(FLOORS).sort();
+        DB.tabs=[{floor:fls[0]||'2',title:(fls[0]||'2')+'층'},{floor:fls[1]||fls[0]||'3',title:(fls[1]||fls[0]||'3')+'층'}]; }
+      if(!DB.lastAutoClear)DB.lastAutoClear='';
+      if(d.roster && d.roster.students && d.roster.students.length){
+        rosterMeta=d.roster.meta||rosterMeta; buildRoster(d.roster.students);
+        localStorage.setItem(ROSTER_KEY, JSON.stringify({students:STUDENTS,meta:rosterMeta}));
+      }
+      curDate=workDateStr(); autoFollow=true; closeOv('ov-data');
+      save(); init();
+      toast(`복원 완료 (${n}일분) — 달력에서 날짜를 선택하세요`);
+      openCalendar(true);
+    }catch(err){ toast('파일을 읽을 수 없습니다'); ev.target.value=''; } };
+  rd.readAsText(f); ev.target.value='';
+}
+
+/* ===== 구글 드라이브 자동 백업 (GIS 토큰 · drive.file) ===== */
+const GDRIVE_SCOPE="https://www.googleapis.com/auth/drive.file";
+let gTokenClient=null, gAccessToken="", gTokenExp=0, gTokenCb=null;
+function gd(){ DB.settings=DB.settings||{}; return (DB.settings.gdrive=DB.settings.gdrive||{clientId:"",auto:false,folderId:"",folderName:"",keepDays:30}); }
+function gdriveFolder(){ return (DB.progTitle||"기숙사퇴실체크아웃")+"_백업"; }
+function gisReady(){ return typeof google!=="undefined" && google.accounts && google.accounts.oauth2; }
+function gInitClient(){
+  const cfg=gd(); if(!cfg.clientId){toast("먼저 클라이언트 ID를 입력하세요");return false;}
+  if(!gisReady()){toast("구글 모듈 로딩 실패(인터넷 확인)");return false;}
+  if(!gTokenClient){
+    gTokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:cfg.clientId, scope:GDRIVE_SCOPE,
+      callback:(resp)=>{ if(resp&&resp.access_token){gAccessToken=resp.access_token; gTokenExp=Date.now()+(resp.expires_in?resp.expires_in*1000:3500000); if(gTokenCb){const cb=gTokenCb;gTokenCb=null;cb(true);}}
+        else { if(gTokenCb){const cb=gTokenCb;gTokenCb=null;cb(false);} } },
+      error_callback:()=>{ if(gTokenCb){const cb=gTokenCb;gTokenCb=null;cb(false);} }
+    });
+  }
+  return true;
+}
+function gGetToken(interactive){
+  return new Promise(res=>{
+    if(gAccessToken && Date.now()<gTokenExp-60000) return res(true);
+    if(!gInitClient()) return res(false);
+    gTokenCb=res;
+    try{ gTokenClient.requestAccessToken({prompt: interactive?"consent":""}); }
+    catch(e){ gTokenCb=null; res(false); }
+  });
+}
+async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({Authorization:"Bearer "+gAccessToken},opts.headers||{});
+  const r=await fetch(url,opts); if(r.status===401){gAccessToken="";throw new Error("auth");} return r; }
+async function gEnsureFolder(){
+  const cfg=gd(); const fname=gdriveFolder();
+  if(cfg.folderId && cfg.folderName===fname){
+    try{const r=await gFetch(`https://www.googleapis.com/drive/v3/files/${cfg.folderId}?fields=id,trashed`);
+      if(r.ok){const j=await r.json(); if(j.id&&!j.trashed)return cfg.folderId;}}catch(e){}
+  }
+  const q=encodeURIComponent(`name='${fname}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  let r=await gFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+  let j=await r.json();
+  if(j.files&&j.files.length){cfg.folderId=j.files[0].id;cfg.folderName=fname;save();return cfg.folderId;}
+  r=await gFetch("https://www.googleapis.com/drive/v3/files?fields=id",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({name:fname,mimeType:"application/vnd.google-apps.folder"})});
+  j=await r.json(); cfg.folderId=j.id; cfg.folderName=fname; save(); return cfg.folderId;
+}
+async function gFindFile(name,folderId){
+  const q=encodeURIComponent(`name='${name}' and '${folderId}' in parents and trashed=false`);
+  const r=await gFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+  const j=await r.json(); return (j.files&&j.files.length)?j.files[0]:null;
+}
+async function gPutFile(name,jsonStr,folderId,existingId){
+  const form=new FormData();
+  const meta=existingId?{name}:{name,parents:[folderId]};
+  form.append("metadata",new Blob([JSON.stringify(meta)],{type:"application/json"}));
+  form.append("file",new Blob([jsonStr],{type:"application/json"}));
+  const url=existingId
+    ?`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id,name`
+    :`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name`;
+  const r=await gFetch(url,{method:existingId?"PATCH":"POST",body:form});
+  if(!r.ok)throw new Error("upload "+r.status);
+  return await r.json();
+}
+async function gCleanOld(folderId,keepDays){
+  try{
+    const q=encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+    const r=await gFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime`);
+    const j=await r.json(); if(!j.files)return;
+    const cutoff=Date.now()-(keepDays||30)*86400000;
+    for(const f of j.files){
+      if(f.name==="최신.json")continue;
+      if(new Date(f.createdTime).getTime()<cutoff){
+        try{await gFetch(`https://www.googleapis.com/drive/v3/files/${f.id}`,{method:"DELETE"});}catch(e){}
+      }
+    }
+  }catch(e){}
+}
+async function gUploadBackup(){
+  const folderId=await gEnsureFolder();
+  const jsonStr=JSON.stringify(buildBackupPayload());
+  const latest=await gFindFile("최신.json",folderId);
+  await gPutFile("최신.json",jsonStr,folderId,latest?latest.id:null);
+  const dayName=todayStr()+".json";
+  const dayFile=await gFindFile(dayName,folderId);
+  const uploaded=await gPutFile(dayName,jsonStr,folderId,dayFile?dayFile.id:null);
+  gCleanOld(folderId,gd().keepDays||30);
+  return uploaded;
+}
+async function driveConnect(){
+  if(!gInitClient())return;
+  toast("구글 연결 중...");
+  const ok=await gGetToken(true);
+  if(!ok){toast("구글 연결 취소/실패");return;}
+  try{ await gEnsureFolder(); renderDriveStatus(); toast("구글 드라이브 연결됨"); }
+  catch(e){ toast("폴더 준비 실패 — 권한을 확인하세요"); }
+}
+async function driveBackupNow(interactive){
+  const cfg=gd(); if(!cfg.clientId){toast("클라이언트 ID를 입력하세요");return;}
+  const ok=await gGetToken(interactive!==false);
+  if(!ok){ if(interactive!==false)toast("구글 인증 필요 — [구글 연결]을 먼저 눌러주세요"); return; }
+  try{ const f=await gUploadBackup(); renderDriveStatus(f.name); if(interactive!==false)toast("드라이브 업로드 완료: "+f.name); }
+  catch(e){ if(interactive!==false)toast("업로드 실패 — 연결/권한 확인"); }
+}
+function toggleDriveSettings(){
+  const p=document.getElementById("gd-settings-panel");
+  const lbl=document.getElementById("gd-setting-lbl");
+  const ico=document.getElementById("gd-setting-ico");
+  const show=p.style.display==="none";
+  p.style.display=show?"block":"none";
+  lbl.innerHTML=show?"드라이브 연결 설정 닫기<small>설정 완료 후 닫으세요</small>"
+                    :"드라이브 연결 설정 열기<small>클라이언트 ID · 구글 연결 · 자동 백업</small>";
+  ico.textContent=show?"🔼":"⚙️";
+}
+function saveDriveClientId(){gd().clientId=document.getElementById("gd-clientid").value.trim();save();gTokenClient=null;renderDriveStatus();}
+function toggleDriveAuto(){gd().auto=document.getElementById("gd-auto").checked;save();renderDriveStatus();}
+function saveDriveKeepDays(){gd().keepDays=+document.getElementById("gd-keepdays").value||30;save();}
+function renderDriveStatus(lastName){
+  const cfg=gd(),el=document.getElementById("gd-status"); if(!el)return;
+  let s=cfg.clientId?"✅ 클라이언트 ID 등록됨":"❌ 클라이언트 ID 미등록";
+  s+=cfg.folderId?` · 📁 폴더 연결됨(<b>${esc(cfg.folderName||gdriveFolder())}</b>)`:" · 📁 폴더 미연결";
+  s+=cfg.auto?" · 🔄 자동 ON":" · 자동 OFF";
+  s+=` · 보관 <b>${cfg.keepDays||30}일</b>`;
+  if(lastName)s+=`<br>🕒 최근 업로드: <b>${esc(lastName)}</b>`;
+  el.innerHTML=s;
+  const a=document.getElementById("gd-auto"); if(a)a.checked=!!cfg.auto;
+  const c=document.getElementById("gd-clientid"); if(c&&!c.value)c.value=cfg.clientId||"";
+  const k=document.getElementById("gd-keepdays"); if(k)k.value=String(cfg.keepDays||30);
+}
+
+/* ===== 엑셀 내보내기 (보고용) ===== */
+function exportXlsx(){
+  if(typeof XLSX==="undefined"){toast("엑셀 모듈 로딩 실패(인터넷 필요)");return;}
+  const from=document.getElementById("exp-from").value, to=document.getElementById("exp-to").value;
+  const inR=d=>(!from||d>=from)&&(!to||d<=to);
+  const byHakAsc=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true});
+  const rows=[];
+  Object.keys(DB.records||{}).filter(inR).sort().forEach(date=>{
+    const r=DB.records[date]||{};
+    Object.keys(r.individual||{}).sort(byHakAsc).forEach(hak=>{
+      const s=byHak[hak]||{name:"?",room:""};
+      const items=Object.keys(r.individual[hak]).filter(k=>r.individual[hak][k]);
+      if(items.length) rows.push([date,"개인벌점",s.room||"",hak,s.name,items.join(", ")]);
+    });
+    Object.keys(r.room||{}).sort((a,b)=>+a-+b).forEach(no=>{
+      const rd=r.room[no]||{}; const dem=Object.keys(rd.demerits||{}).filter(k=>rd.demerits[k]);
+      if(!dem.length) return;
+      (ROOMS[no]||[]).filter(s=>!(r.exclusions&&r.exclusions[s.hak])).sort((a,b)=>byHakAsc(a.hak,b.hak))
+        .forEach(s=>rows.push([date,"호실벌점",no,s.hak,s.name,dem.join(", ")]));
+    });
+  });
+  if(!rows.length){toast("내보낼 기록이 없습니다");return;}
+  const aoa=[["날짜","구분","호실","학번","이름","벌점항목"],...rows];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:11},{wch:9},{wch:7},{wch:8},{wch:14},{wch:24}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"퇴실체크아웃");
+  const fn=`${(DB.progTitle||'기숙사퇴실체크아웃')}_${(from||'').replace(/-/g,'')}-${(to||'').replace(/-/g,'')}.xlsx`;
+  XLSX.writeFile(wb,fn);
+  toast("엑셀 파일 저장됨");
+}
+
+/* ===== 기록 달력 ===== */
+let calY, calM;
+function dataDays(){
+  const s=new Set();
+  Object.entries(DB.records||{}).forEach(([d,r])=>{
+    const has = (r.individual&&Object.keys(r.individual).length) ||
+                (r.room&&Object.keys(r.room).length) ||
+                (r.memo&&r.memo.trim());
+    if(has) s.add(d);
+  });
+  return s;
+}
+function openCalendar(afterRestore){
+  const days=[...dataDays()].sort();
+  const focus = (afterRestore && days.length) ? days[days.length-1] : (curDate||workDateStr());
+  const f=new Date(focus+'T00:00'); calY=f.getFullYear(); calM=f.getMonth();
+  renderCal(); showOv('ov-cal');
+}
+function calShift(n){ const dt=new Date(calY, calM+n, 1); calY=dt.getFullYear(); calM=dt.getMonth(); renderCal(); }
+function renderCal(){
+  const has=dataDays(); const today=workDateStr();
+  const startDow=new Date(calY,calM,1).getDay();
+  const dim=new Date(calY,calM+1,0).getDate();
+  let h=`<div class="cal-nav"><button class="cal-arrow" onclick="calShift(-1)">‹</button>`+
+        `<b>${calY}년 ${calM+1}월</b><button class="cal-arrow" onclick="calShift(1)">›</button></div>`;
+  h+=`<div class="cal-grid">`;
+  ['일','월','화','수','목','금','토'].forEach((w,i)=>h+=`<div class="cal-w${i===0?' sun':''}">${w}</div>`);
+  for(let i=0;i<startDow;i++) h+=`<div></div>`;
+  for(let d=1; d<=dim; d++){
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cls=['cal-d']; if(has.has(ds))cls.push('has'); if(ds===today)cls.push('today'); if(ds===curDate)cls.push('cur');
+    h+=`<button class="${cls.join(' ')}" onclick="pickDate('${ds}')">${d}</button>`;
+  }
+  h+=`</div>`;
+  document.getElementById('cal-body').innerHTML=h;
+}
+function pickDate(ds){
+  curDate=ds; autoFollow=(ds>=workDateStr());
+  document.getElementById('date-input').value=ds;
+  closeOv('ov-cal'); render(); toast(`${ds} 시트로 이동`);
+}
+
+/* ===== 제목 변경 ===== */
+function editProgTitle(){ const v=prompt('프로그램 제목',DB.progTitle); if(v!==null&&v.trim()){DB.progTitle=v.trim();
+  document.getElementById('prog-title').textContent=DB.progTitle; save();} }
+
+function openData(){
+  pendingRoster=null;
+  const rf=document.getElementById('roster-file'); if(rf) rf.value='';
+  document.getElementById('roster-preview').innerHTML='';
+  document.getElementById('roster-apply').disabled=true;
+  renderRosterStatus();
+  renderAutoInfo();
+  renderDriveStatus();
+  const ef=document.getElementById('exp-from'), et=document.getElementById('exp-to');
+  if(ef&&!ef.value) ef.value=addDays(todayStr(),-13);
+  if(et&&!et.value) et.value=todayStr();
+  showOv('ov-data');
+}
+function renderRosterStatus(){
+  const tot=STUDENTS.length;
+  document.getElementById('roster-status').innerHTML=
+    `<div class="hint" style="border-style:solid"><b>현재 명단</b> · ${rosterMeta.source}${rosterMeta.when?` (${rosterMeta.when})`:''}<br>학생 ${tot}명 · 호실 ${Object.keys(ROOMS).length}개</div>`;
+}
+function renderAutoInfo(){
+  document.getElementById('auto-info').innerHTML=
+    `<div class="hint" style="border-style:solid">달력상 새 날이 시작되면 <b>당일 빈 시트</b>로 자동 전환됩니다(늦어도 오전 11시 이전). `+
+    `전날 기록은 <b>날짜별로 영구 보관</b>되어 상점·벌점 기간 집계에 영향이 없습니다.<br>`+
+    `마지막 자동전환 처리일: <b>${DB.lastAutoClear||'-'}</b> · 과거 날짜는 상단 날짜 선택으로 열람/수정할 수 있습니다.</div>`;
+}
+
+/* ===== 명단(방배정) 등록 ===== */
+let pendingRoster=null, pendingRosterMeta=null;
+function parseRoster(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  if(typeof XLSX==='undefined'){ toast('엑셀 모듈 로딩 실패(인터넷 필요)'); return; }
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const found=[]; const seen=new Set();
+      rows.forEach(row=>{
+        for(let c=0;c<row.length-2;c++){
+          const hak=String(row[c]).trim(), name=String(row[c+1]).trim(), room=String(row[c+2]).trim();
+          if(/^\d{4}$/.test(hak) && name && /^\d{3}$/.test(room) && !/[A-Za-z가-힣]/.test(room)){
+            if(seen.has(hak+'|'+name)) continue; seen.add(hak+'|'+name);
+            found.push({hak,name,grade:+hak[0]||1,room});
+          }
+        }
+      });
+      const prev=document.getElementById('roster-preview');
+      if(!found.length){ prev.innerHTML='<div class="hint" style="color:#dc2626">학번·이름·호실 형식을 찾지 못했습니다. 파일 양식을 확인하세요.</div>';
+        document.getElementById('roster-apply').disabled=true; return; }
+      pendingRoster=found;
+      pendingRosterMeta={source:'등록: '+f.name, count:found.length, when:new Date().toLocaleString('ko-KR')};
+      prev.innerHTML=`<div class="hint" style="border-style:solid;border-color:#10b981;color:#047857">
+        ✅ 인식 완료: 학생 <b>${found.length}</b>명</div>`;
+      document.getElementById('roster-apply').disabled=false;
+    }catch(err){ toast('엑셀을 읽을 수 없습니다'); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function applyRoster(){
+  if(!pendingRoster) return;
+  if(!confirm(`방배정 명단을 교체할까요? (학생 ${pendingRoster.length}명)\n기존 벌점/메모 기록은 유지됩니다.`)) return;
+  localStorage.setItem(ROSTER_KEY, JSON.stringify({students:pendingRoster, meta:pendingRosterMeta}));
+  rosterMeta=pendingRosterMeta; buildRoster(pendingRoster);
+  render(); renderRosterStatus();
+  pendingRoster=null; document.getElementById('roster-apply').disabled=true;
+  document.getElementById('roster-preview').innerHTML='';
+  toast('명단이 등록·저장되었습니다');
+}
+function resetRoster(){
+  if(!confirm('기본 내장 명단으로 되돌릴까요?')) return;
+  localStorage.removeItem(ROSTER_KEY);
+  rosterMeta={source:'기본 내장 명단', count:DORM_DATA.students.length, when:''};
+  buildRoster(DORM_DATA.students);
+  render(); renderRosterStatus(); toast('기본 내장 명단으로 복귀');
+}
+
+/* ===== 당일 일지 연동 ===== */
+let pendingLink=null;
+function openLink(){
+  pendingLink=null; document.getElementById('link-file').value='';
+  document.getElementById('link-preview').innerHTML='';
+  document.getElementById('link-apply').disabled=true;
+  document.getElementById('link-date-lbl').textContent=curDate;
+  renderLinkStatusBox(); showOv('ov-link');
+}
+function renderLinkStatusBox(){
+  const r=R(); const box=document.getElementById('link-status-box');
+  if(r.logLink){ box.innerHTML=`<div class="hint" style="border-style:solid;border-color:#10b981;color:#047857">
+    ✅ <b>연동됨</b> · ${r.logLink.file}<br>· ${r.logLink.count}명 반영 · ${r.logLink.when}</div>`; }
+  else box.innerHTML=`<div class="hint" style="border-style:solid;border-color:#fdba74;color:#b45309">
+    ⚠️ ${curDate} 일지가 아직 연동되지 않았습니다.</div>`;
+}
+function parseLink(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  if(typeof XLSX==='undefined'){ toast('엑셀 모듈 로딩 실패(인터넷 필요)'); return; }
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const T=v=>String(v==null?'':v).trim();
+      const names=wb.SheetNames;
+      const statusName=names.find(n=>/입실현황/.test(n));
+      const gwigaName=names.find(n=>/귀가/.test(n));
+      let shName,mode;
+      if(statusName){shName=statusName;mode='status';}
+      else if(gwigaName){shName=gwigaName;mode='gwiga';}
+      else{toast("'기숙사입실현황' 또는 '귀가' 시트를 찾지 못했습니다");ev.target.value='';return;}
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[shName],{header:1,defval:''});
+      const cand=[];
+      const pickExitLabel=raw=>{ const t=T(raw);
+        if(/미입사/.test(t))return'미입사';
+        if(/명령\s*퇴사/.test(t))return'명령퇴사';
+        if(/자진\s*퇴사/.test(t))return'자진퇴사';
+        if(/퇴사/.test(t))return'퇴사';
+        return'퇴사'; };
+      const pickLeaveLabel=raw=>{ const t=T(raw); return t||'귀가'; };
+      if(mode==='gwiga'){
+        // 귀가 시트: 상단 귀가표만 사용 (학번열 두 번째 등장 시 중단), '구분' 열 값을 라벨로 사용
+        let head=-1,cHak=-1,cName=-1,cDiv=-1;
+        for(let r=0;r<rows.length;r++){const cells=rows[r].map(T);
+          const h=cells.indexOf('학번'); if(h>=0){head=r;cHak=h;cName=cells.indexOf('이름');cDiv=cells.indexOf('구분');break;}}
+        if(head>=0){
+          for(let r=head+1;r<rows.length;r++){const cells=rows[r].map(T);
+            if(cells.indexOf('학번')>=0)break;
+            const hak=T(rows[r][cHak]);
+            if(/^\d{4}$/.test(hak)){
+              const label=cDiv>=0?pickLeaveLabel(rows[r][cDiv]):'귀가';
+              cand.push({hak,name:cName>=0?T(rows[r][cName]):'',label});
+            }}
+        }
+      }else{
+        // 기숙사입실현황 시트: '미입사자 퇴사자' 표 + '귀가자' 표를 구간으로 구분해 각각 다른 라벨 규칙 적용
+        let hakCols=[]; let section=null;
+        rows.forEach(row=>{const cells=row.map(T);
+          const joined=cells.join(' ');
+          if(/미입사자/.test(joined)){section='exit';return;}
+          if(/귀가자/.test(joined)){section='leave';return;}
+          const hs=[]; cells.forEach((c,i)=>{if(c==='학번')hs.push(i);});
+          if(hs.length){hakCols=hs;return;}
+          hakCols.forEach(hc=>{const hak=T(row[hc]);
+            if(/^\d{4}$/.test(hak)){
+              let label;
+              if(section==='exit'){ label=pickExitLabel(row[hc+3]); }
+              else if(section==='leave'){ label=pickLeaveLabel(row[hc+2]); }
+              else label='귀가';
+              cand.push({hak,name:T(row[hc+1]),label});
+            }});
+        });
+      }
+      // 총원 명단 매칭 (학번 + 이름 일치, 여학생/비명단 자동 제외)
+      const norm=s=>T(s).replace(/\s/g,''), base=s=>norm(s).replace(/[A-Za-z]$/,'');
+      const nmatch=(a,b)=>{a=norm(a);b=norm(b);if(!b)return true;const A=base(a),B=base(b);
+        return a===b||A===B||A.startsWith(B)||B.startsWith(A);};
+      const result={}; let cnt=0,dropped=0; const seen=new Set();
+      cand.forEach(c=>{const s=byHak[c.hak];
+        if(s&&nmatch(s.name,c.name)){if(!seen.has(c.hak)){seen.add(c.hak);result[c.hak]=c.label||'귀가';cnt++;}}
+        else dropped++;});
+      const srcLabel=mode==='status'?'기숙사입실현황':'귀가';
+      pendingLink={result,file:f.name,count:cnt,sheet:srcLabel,dropped};
+      const prev=document.getElementById('link-preview');
+      if(!cnt){
+        prev.innerHTML=`<div class="hint" style="color:#b45309">현재 명단과 매칭되는 귀가·퇴사·미입사 학생이 없습니다.<br>시트: ${srcLabel} (확인: 남학생 명단인지, 파일 양식이 맞는지)</div>`;
+        document.getElementById('link-apply').disabled=false; return;
+      }
+      const names2=Object.keys(result).map(h=>`${byHak[h]?byHak[h].room+'호 '+byHak[h].name:h}(${result[h]})`).join(', ');
+      prev.innerHTML=`<div class="hint" style="border-style:solid;border-color:#10b981;color:#047857">
+        ✅ <b>시트: ${srcLabel}</b> · 매칭 <b>${cnt}</b>명${dropped?` (명단 외 제외 ${dropped}명)`:''}<br>${names2}</div>`;
+      document.getElementById('link-apply').disabled=false;
+    }catch(err){ toast('엑셀을 읽을 수 없습니다'); }
+  };
+  rd.readAsArrayBuffer(f); ev.target.value='';
+}
+function stColor(st){ return st==='귀가'?'#0ea5e9':st==='퇴사'?'#64748b':st==='미입사'?'#a855f7':st==='결석'?'#e11d48':st==='조퇴'?'#f59e0b':'#64748b'; }
+function applyLink(){
+  if(!pendingLink) return;
+  const r=R();
+  if(!r.manualSet) r.manualSet={};
+  let cleared=0;
+  // 오늘 파일이 권위. manualSet(직접 지정)에 없는 장기 제외자(퇴사/미입사)는 모두 비운다 → 과거 잘못된 승계 정리.
+  Object.keys(r.exclusions).forEach(h=>{
+    if(!r.manualSet[h] && isLongTerm(r.exclusions[h])){ delete r.exclusions[h]; cleared++; }
+  });
+  Object.entries(pendingLink.result).forEach(([h,st])=>{ r.exclusions[h]=st; });
+  r.logLink={file:pendingLink.file, count:pendingLink.count, when:new Date().toLocaleString('ko-KR')};
+  save(); closeOv('ov-link'); render(); renderLinkBar();
+  toast(`당일 일지 연동 완료 (${pendingLink.count}명${cleared?`, 복귀 처리로 ${cleared}명 자동 해제`:''})`);
+}
+function unlinkLog(){
+  const r=R();
+  if(!r.logLink){ toast('연동된 일지가 없습니다'); return; }
+  if(!confirm('당일 일지 연동을 해제할까요?\n(자동 반영된 귀가/미입사 표시도 함께 해제됩니다. 퇴사는 유지)')) return;
+  if(!r.manualSet) r.manualSet={};
+  Object.keys(r.exclusions).forEach(h=>{ if(!r.manualSet[h]){ delete r.exclusions[h]; } });
+  delete r.logLink; save(); render(); renderLinkBar(); renderLinkStatusBox();
+  toast('연동이 해제되었습니다');
+}
+function renderLinkBar(){
+  const r=R(); const bar=document.getElementById('link-bar');
+  const btn=document.getElementById('link-tool-btn');
+  if(r.logLink){ bar.className='link-bar on';
+    bar.innerHTML=`🔗 당일 일지: <b>연동됨</b> · ${r.logLink.file} · ${r.logLink.count}명 제외 반영`;
+    if(btn){ btn.classList.add('linked'); btn.innerHTML='✅ 일지 연동완료'; } }
+  else { bar.className='link-bar off';
+    bar.innerHTML=`🔗 당일 일지: <b>미연동</b> — 눌러서 ${curDate} 미입사·퇴사·귀가 명단을 연동하세요`;
+    if(btn){ btn.classList.remove('linked'); btn.innerHTML='🔗 당일 일지 연동'; } }
+}
+
+
+function showOv(id){ document.getElementById(id).classList.add('show'); }
+function closeOv(id){ document.getElementById(id).classList.remove('show'); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1600); }
+function addDays(d,n){ const dt=new Date(d+'T00:00'); dt.setDate(dt.getDate()+n);
+  return dt.toISOString().slice(0,10); }
+function setupMemoScroll(){
+  const m=document.getElementById('memo');
+  if(m._kbBound) return; m._kbBound=true;
+  const vv=window.visualViewport;
+  function update(){
+    if(!document.body.classList.contains('memo-float')) return;
+    let kb=0;
+    if(vv) kb=Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty('--kb', kb+'px');
+  }
+  m.addEventListener('focus',()=>{
+    document.body.classList.add('memo-float');
+    update(); setTimeout(update,60); setTimeout(update,250); setTimeout(update,500);
+    if(!vv) setTimeout(()=>m.scrollIntoView({behavior:'smooth',block:'center'}),300);
+  });
+  m.addEventListener('blur',()=>{
+    document.body.classList.remove('memo-float');
+    document.documentElement.style.removeProperty('--kb');
+  });
+  if(vv){ vv.addEventListener('resize',update); vv.addEventListener('scroll',update); }
+}
+
+/* ===== 전체화면 / 한 화면 맞춤 ===== */
+function toggleFull(){
+  if(!document.body.classList.contains('fit')){
+    const el=document.documentElement;
+    const req=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(req){ try{ const p=req.call(el); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+    enterFit();
+  }else{
+    if(document.fullscreenElement){ const ex=document.exitFullscreen||document.webkitExitFullscreen;
+      if(ex){ try{ ex.call(document); }catch(e){} } }
+    exitFit();
+  }
+}
+function enterFit(){ document.body.classList.add('fit'); document.getElementById('fs-btn').textContent='⛶ 해제'; fitGrid(); }
+function exitFit(){ document.body.classList.remove('fit'); document.getElementById('fs-btn').textContent='⛶ 전체화면'; document.documentElement.style.removeProperty('--cols'); }
+document.addEventListener('fullscreenchange',()=>{ if(document.fullscreenElement) enterFit(); else exitFit(); });
+document.addEventListener('webkitfullscreenchange',()=>{ if(document.fullscreenElement) enterFit(); else exitFit(); });
+
+/* 한 화면에 모든 호실이 들어가도록 열 수 자동 계산 */
+function fitGrid(){
+  if(!document.body.classList.contains('fit')) return;
+  const grid=document.getElementById('grid'); const floor=document.querySelector('.floor');
+  if(!grid||!floor) return;
+  const allRooms = Object.keys(ROOMS);
+  const n=allRooms.length; if(!n) return;
+  
+  const W=floor.clientWidth, H=floor.clientHeight, gap=6;
+  let best=null;
+  for(let cols=1; cols<=10; cols++){
+    const rows=Math.ceil(n/cols);
+    const cw=(W-gap*(cols-1))/cols, ch=(H-gap*(rows-1))/rows;
+    if(cw<118) continue;
+    const score=Math.min(cw/150,1)*ch;
+    if(ch>=84 && (!best||score>best.score)) best={cols,score};
+  }
+  if(!best){
+    let bc=1,bh=0;
+    for(let cols=1; cols<=10; cols++){ const rows=Math.ceil(n/cols);
+      const cw=(W-gap*(cols-1))/cols; if(cw<108)continue; const ch=(H-gap*(rows-1))/rows; if(ch>bh){bh=ch;bc=cols;} }
+    best={cols:bc};
+  }
+  const cols=best.cols, rows=Math.ceil(n/cols);
+  const cellH=(H-gap*(rows-1))/rows;
+  
+  let maxStu=1; allRooms.forEach(no=>maxStu=Math.max(maxStu,(ROOMS[no]||[]).length));
+  const perStu=Math.max(14,(cellH-24-10)/maxStu);
+  let nm=Math.round(perStu*0.5); nm=Math.max(13,Math.min(30,nm));
+  const stugap = perStu>42?5:(perStu>30?4:2);
+  const rno=Math.max(13,Math.min(20,Math.round(cellH*0.13)));
+  const ds=document.documentElement.style;
+  ds.setProperty('--cols', cols);
+  ds.setProperty('--nm', nm+'px');
+  ds.setProperty('--stugap', stugap+'px');
+  ds.setProperty('--rno', rno+'px');
+}
+window.addEventListener('resize', ()=>{ clearTimeout(window._fr); window._fr=setTimeout(fitGrid,120); });
+document.querySelectorAll('.ov').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('show'); }));
+
+init();
+(function autoDriveBackup(){
+  const cfg=(DB.settings&&DB.settings.gdrive)||{};
+  if(!cfg.auto||!cfg.clientId)return;
+  let tries=0;
+  const t=setInterval(()=>{ tries++;
+    if(gisReady()){clearInterval(t); setTimeout(()=>driveBackupNow(false),1500);}
+    else if(tries>20)clearInterval(t);
+  },500);
+})();
+</script>
+</body>
+</html>
